@@ -19,7 +19,7 @@ Requisitos:
 1. Clonar el Repositorio:
    Abre tu terminal o línea de comandos y ejecuta:
    ```bash
-   git clone [URL_DEL_REPOSITORIO_GITHUB] # Reemplaza con la URL real del repositorio
+   git clone [ https://github.com/Byjuanga/100-functional-calendar-created-by-AI.git] # 
    cd MiCalendarioApp
    ```
 
