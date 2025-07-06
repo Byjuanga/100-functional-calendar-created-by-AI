@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiCalendarioApp - Local</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- ESTADO Y LÓGICA DE DATOS LOCALES ---
+            let appState = {};
+
+            function loadData() {
+                const data = localStorage.getItem('miCalendarioDataV5');
+                if (data) {
+                    appState = JSON.parse(data);
+                } else {
+                    // Estado inicial si no hay datos guardados
+                    appState = {
+                        notes: {}, // Formato: { 'YYYY-MM-DD': [{id, text, completed}, ...] }
+                        tasks: {
+                            month: [],
+                            year: []
+                        }
+                    };
+                }
+            }
+
+            function saveData() {
+                localStorage.setItem('miCalendarioDataV5', JSON.stringify(appState));
+            }
+
+            // Carga inicial de datos
+            loadData();
+
+            // --- LÓGICA PRINCIPAL DE LA APLICACIÓN ---
+            const calendarState = { currentDate: new Date() };
+            const elements = {
+                monthYear: document.getElementById('month-year'),
+                calendarGrid: document.getElementById('calendar-grid'),
+                prevMonthBtn: document.getElementById('prev-month'),
+                nextMonthBtn: document.getElementById('next-month'),
+                taskPanel: document.getElementById('task-panel'),
+                taskPanelDate: document.getElementById('task-panel-date'),
+                notesList: document.getElementById('notes-list'),
+                addNoteInput: document.getElementById('add-note-input'),
+                addNoteBtn: document.getElementById('add-note-btn'),
+                closePanelBtn: document.getElementById('close-panel-btn'),
+                selectedDate: null,
+                generalTasksBtn: document.getElementById('general-tasks-btn'),
+                calendarView: document.getElementById('calendar-view'),
+                generalTasksView: document.getElementById('general-tasks-view'),
+                closeTasksViewBtn: document.getElementById('close-tasks-view-btn'),
+                monthTasksList: document.getElementById('month-tasks-list'),
+                yearGoalsList: document.getElementById('year-goals-list'),
+                addMonthTaskInput: document.getElementById('add-month-task-input'),
+                addYearGoalInput: document.getElementById('add-year-goal-input'),
+                addMonthTaskBtn: document.getElementById('add-month-task-btn'),
+                addYearGoalBtn: document.getElementById('add-year-goal-btn'),
+            };
+
+            const renderCalendar = () => {
+                elements.calendarGrid.innerHTML = '';
+                const date = calendarState.currentDate;
+                const year = date.getFullYear();
+                const month = date.getMonth();
+                elements.monthYear.textContent = `${date.toLocaleString('es-ES', { month: 'long' }).toUpperCase()} ${year}`;
+                const firstDayOfMonth = new Date(year, month, 1).getDay();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+                for (let i = 0; i < startDay; i++) elements.calendarGrid.innerHTML += `<div class="day-cell empty"></div>`;
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const fullDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const today = new Date();
+                    const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+                    const hasNotes = appState.notes[fullDate] && appState.notes[fullDate].length > 0;
+                    const dayCell = document.createElement('div');
+                    dayCell.className = `day-cell group relative flex items-center justify-center p-2 h-24 cursor-pointer transition-all duration-300 ease-in-out transform hover:scale-105 hover:z-10`;
+                    dayCell.dataset.date = fullDate;
+                    let bgClass = isToday ? 'bg-blue-200/50 hover:bg-blue-200/90' : 'bg-white/40 hover:bg-white/80';
+                    dayCell.innerHTML = `<span class="absolute top-2 right-2 text-sm md:text-base ${isToday ? 'font-bold text-blue-800' : 'text-gray-600'}">${day}</span> ${hasNotes ? '<div class="absolute bottom-2 left-2 w-2 h-2 bg-teal-500 rounded-full shadow-md"></div>' : ''}`;
+                    dayCell.classList.add(...bgClass.split(' '));
+                    dayCell.addEventListener('click', () => openTaskPanel(fullDate));
+                    elements.calendarGrid.appendChild(dayCell);
+                }
+            };
+            
+            const openTaskPanel = (dateStr) => {
+                elements.selectedDate = dateStr;
+                const date = new Date(dateStr + 'T00:00:00');
+                elements.taskPanelDate.textContent = date.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                renderNotesForDate(dateStr);
+                elements.taskPanel.classList.remove('translate-x-full');
+            };
+
+            const closeTaskPanel = () => {
+                elements.taskPanel.classList.add('translate-x-full');
+            };
+            
+            const renderNotesForDate = (dateStr) => {
+                elements.notesList.innerHTML = '';
+                const notes = appState.notes[dateStr] || [];
+                if (notes.length === 0) {
+                    elements.notesList.innerHTML = `<li class="text-center text-gray-500 italic py-4">No hay tareas para este día.</li>`;
+                    return;
+                }
+                notes.forEach(note => {
+                    const li = document.createElement('li');
+                    li.className = 'note-item flex items-center justify-between bg-white/50 p-3 rounded-lg shadow-sm mb-2';
+                    li.innerHTML = `<div class="flex items-center"><input type="checkbox" data-id="${note.id}" ${note.completed ? 'checked' : ''} class="mr-3 h-5 w-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500"><span class="${note.completed ? 'line-through text-gray-500' : 'text-gray-800'}">${note.text}</span></div><button data-id="${note.id}" class="delete-note-btn text-gray-400 hover:text-red-500 transition-colors"><i class="ph-trash text-xl"></i></button>`;
+                    elements.notesList.appendChild(li);
+                });
+            };
+
+            const addNote = () => {
+                const text = elements.addNoteInput.value.trim();
+                if (text && elements.selectedDate) {
+                    const newNote = { id: Date.now().toString(), text, completed: false };
+                    if (!appState.notes[elements.selectedDate]) {
+                        appState.notes[elements.selectedDate] = [];
+                    }
+                    appState.notes[elements.selectedDate].push(newNote);
+                    saveData();
+                    renderNotesForDate(elements.selectedDate);
+                    renderCalendar();
+                    elements.addNoteInput.value = '';
+                }
+            };
+            
+            elements.notesList.addEventListener('click', (e) => {
+                const target = e.target;
+                if (target.matches('input[type="checkbox"]')) {
+                    const noteId = target.dataset.id;
+                    const note = appState.notes[elements.selectedDate].find(n => n.id === noteId);
+                    if (note) {
+                        note.completed = target.checked;
+                        saveData();
+                        renderNotesForDate(elements.selectedDate);
+                    }
+                } else if (target.closest('.delete-note-btn')) {
+                    const noteId = target.closest('.delete-note-btn').dataset.id;
+                    appState.notes[elements.selectedDate] = appState.notes[elements.selectedDate].filter(n => n.id !== noteId);
+                    saveData();
+                    renderNotesForDate(elements.selectedDate);
+                    renderCalendar();
+                }
+            });
+
+            const renderGeneralTasks = () => {
+                const { month, year } = appState.tasks;
+                elements.monthTasksList.innerHTML = '';
+                elements.yearGoalsList.innerHTML = '';
+
+                const createTaskList = (list, tasks) => {
+                    if (tasks.length === 0) {
+                        list.innerHTML = `<li class="text-center text-gray-500 italic py-4">No hay tareas.</li>`;
+                        return;
+                    }
+                    tasks.forEach(task => {
+                        const li = document.createElement('li');
+                        li.className = 'task-item flex items-center justify-between bg-white/50 p-3 rounded-lg shadow-sm mb-2';
+                        li.innerHTML = `<div class="flex items-center"><input type="checkbox" data-id="${task.id}" ${task.completed ? 'checked' : ''} class="mr-3 h-5 w-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500"><span class="${task.completed ? 'line-through text-gray-500' : 'text-gray-800'}">${task.text}</span></div><button data-id="${task.id}" class="delete-task-btn text-gray-400 hover:text-red-500 transition-colors"><i class="ph-trash text-xl"></i></button>`;
+                        list.appendChild(li);
+                    });
+                };
+                createTaskList(elements.monthTasksList, month);
+                createTaskList(elements.yearGoalsList, year);
+            };
+
+            const addGeneralTask = (type) => {
+                const input = type === 'month' ? elements.addMonthTaskInput : elements.addYearGoalInput;
+                const text = input.value.trim();
+                if (text) {
+                    const newTask = { id: Date.now().toString(), text, completed: false };
+                    appState.tasks[type].push(newTask);
+                    saveData();
+                    renderGeneralTasks();
+                    input.value = '';
+                }
+            };
+            
+            const handleGeneralTaskClick = (e, type) => {
+                const target = e.target;
+                const list = appState.tasks[type];
+                if (target.matches('input[type="checkbox"]')) {
+                    const taskId = target.dataset.id;
+                    const task = list.find(t => t.id === taskId);
+                    if (task) {
+                        task.completed = target.checked;
+                        saveData();
+                        renderGeneralTasks();
+                    }
+                } else if (target.closest('.delete-task-btn')) {
+                    const taskId = target.closest('.delete-task-btn').dataset.id;
+                    appState.tasks[type] = list.filter(t => t.id !== taskId);
+                    saveData();
+                    renderGeneralTasks();
+                }
+            };
+            elements.monthTasksList.addEventListener('click', (e) => handleGeneralTaskClick(e, 'month'));
+            elements.yearGoalsList.addEventListener('click', (e) => handleGeneralTaskClick(e, 'year'));
+
+
+            // --- LISTENERS DE EVENTOS GLOBALES ---
+            elements.prevMonthBtn.addEventListener('click', () => { calendarState.currentDate.setMonth(calendarState.currentDate.getMonth() - 1); renderCalendar(); });
+            elements.nextMonthBtn.addEventListener('click', () => { calendarState.currentDate.setMonth(calendarState.currentDate.getMonth() + 1); renderCalendar(); });
+            elements.addNoteBtn.addEventListener('click', addNote);
+            elements.addNoteInput.addEventListener('keypress', (e) => e.key === 'Enter' && addNote());
+            elements.closePanelBtn.addEventListener('click', closeTaskPanel);
+            elements.generalTasksBtn.addEventListener('click', () => {
+                renderGeneralTasks();
+                document.getElementById('calendar-view').classList.add('hidden');
+                elements.generalTasksView.classList.remove('hidden');
+            });
+            elements.closeTasksViewBtn.addEventListener('click', () => {
+                elements.generalTasksView.classList.add('hidden');
+                document.getElementById('calendar-view').classList.remove('hidden');
+            });
+            elements.addMonthTaskBtn.addEventListener('click', () => addGeneralTask('month'));
+            elements.addMonthTaskInput.addEventListener('keypress', (e) => e.key === 'Enter' && addGeneralTask('month'));
+            elements.addYearGoalBtn.addEventListener('click', () => addGeneralTask('year'));
+            elements.addYearGoalInput.addEventListener('keypress', (e) => e.key === 'Enter' && addGeneralTask('year'));
+
+            // --- RENDERIZADO INICIAL ---
+            renderCalendar();
+        });
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F5F5DC; color: #333333; overflow: hidden; }
+        .glass-panel { background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+        .day-cell { border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }
+        .day-cell.empty { background: transparent; box-shadow: none; }
+        #task-panel { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #B2D3C2; border-radius: 10px; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- VISTA DE USUARIO -->
+    <div id="user-view" class="h-screen w-screen p-4 md:p-6 lg:p-8 flex flex-col">
+        <main id="calendar-view" class="flex-grow flex flex-col h-full">
+            <header class="flex items-center justify-between mb-6">
+                <div class="flex items-center space-x-4">
+                    <button id="prev-month" class="p-2 rounded-full bg-white/60 hover:bg-white/90 transition-colors duration-300 shadow-md"><i class="ph-caret-left text-2xl text-gray-700"></i></button>
+                    <h1 id="month-year" class="text-2xl md:text-3xl font-bold tracking-wider text-gray-800"></h1>
+                    <button id="next-month" class="p-2 rounded-full bg-white/60 hover:bg-white/90 transition-colors duration-300 shadow-md"><i class="ph-caret-right text-2xl text-gray-700"></i></button>
+                </div>
+                <button id="general-tasks-btn" class="flex items-center space-x-2 px-4 py-2 rounded-full bg-teal-500 hover:bg-teal-600 text-white font-semibold shadow-lg"><i class="ph-list-checks text-xl"></i><span class="hidden md:inline">Tareas Generales</span></button>
+            </header>
+            <div class="flex-grow glass-panel rounded-2xl p-4"><div class="grid grid-cols-7 gap-2 mb-2 text-center font-semibold text-gray-500"><div>LUN</div><div>MAR</div><div>MIÉ</div><div>JUE</div><div>VIE</div><div>SÁB</div><div>DOM</div></div><div id="calendar-grid" class="calendar-grid h-full"></div></div>
+        </main>
+        <section id="general-tasks-view" class="hidden flex-grow flex flex-col h-full">
+             <header class="flex items-center justify-between mb-6"><h2 class="text-2xl md:text-3xl font-bold tracking-wider text-gray-800">Tareas Generales</h2><button id="close-tasks-view-btn" class="flex items-center space-x-2 px-4 py-2 rounded-full bg-white/60 hover:bg-white/90 shadow-md"><i class="ph-calendar text-xl text-gray-700"></i><span class="hidden md:inline">Volver al Calendario</span></button></header>
+            <div class="flex-grow glass-panel rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto">
+                <div class="bg-white/30 rounded-xl p-4 flex flex-col"><h3 class="text-xl font-bold text-gray-700 mb-4 border-b-2 border-teal-200 pb-2">Tareas del Mes</h3><ul id="month-tasks-list" class="flex-grow space-y-2 overflow-y-auto pr-2"></ul><div id="add-month-task-form" class="mt-4 flex space-x-2"><input id="add-month-task-input" type="text" placeholder="Añadir tarea..." class="w-full px-3 py-2 bg-white/70 border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"><button id="add-month-task-btn" class="flex-shrink-0 bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md">Añadir</button></div></div>
+                <div class="bg-white/30 rounded-xl p-4 flex flex-col"><h3 class="text-xl font-bold text-gray-700 mb-4 border-b-2 border-blue-200 pb-2">Metas del Año</h3><ul id="year-goals-list" class="flex-grow space-y-2 overflow-y-auto pr-2"></ul><div id="add-year-goal-form" class="mt-4 flex space-x-2"><input id="add-year-goal-input" type="text" placeholder="Añadir meta..." class="w-full px-3 py-2 bg-white/70 border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"><button id="add-year-goal-btn" class="flex-shrink-0 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md">Añadir</button></div></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- PANEL LATERAL -->
+    <aside id="task-panel" class="fixed top-0 right-0 h-full w-full max-w-md bg-white/30 backdrop-blur-xl border-l border-white/20 shadow-2xl transform translate-x-full z-40 flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-white/20"><h3 id="task-panel-date" class="font-bold text-lg text-gray-800"></h3><button id="close-panel-btn" class="p-2 rounded-full hover:bg-black/10"><i class="ph-x text-2xl text-gray-700"></i></button></div>
+        <div class="flex-grow p-4 overflow-y-auto"><ul id="notes-list"></ul></div>
+        <div id="add-note-form" class="p-4 border-t border-white/20"><div class="flex space-x-2"><input id="add-note-input" type="text" placeholder="Añadir nota o tarea..." class="w-full px-4 py-3 bg-white/70 border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"><button id="add-note-btn" class="flex-shrink-0 bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md">Añadir</button></div></div>
+    </aside>
+
+</body>
+</html>
